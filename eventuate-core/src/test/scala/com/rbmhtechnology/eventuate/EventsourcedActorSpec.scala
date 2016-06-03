@@ -186,6 +186,30 @@ object EventsourcedActorSpec {
       case evt => evtProbe ! ((evt, lastVectorTimestamp, currentVectorTime, lastSequenceNr))
     }
   }
+
+  class TestUnhandledEmittedEventActor(
+    val logProbe: ActorRef,
+    val cmdProbe: ActorRef,
+    val evtProbe: ActorRef,
+    override val sharedClockEntry: Boolean) extends EventsourcedActor {
+
+    val id = emitterIdA
+    val eventLog = logProbe
+
+    override def onCommand = {
+      case "current-time" =>
+        cmdProbe ! currentVectorTime
+      case s: String =>
+        persist(s) {
+          case Success(evt) => cmdProbe ! evt
+          case Failure(err) => cmdProbe ! err
+        }
+    }
+
+    override def onEvent = {
+      case "a" =>
+    }
+  }
 }
 
 class EventsourcedActorSpec extends TestKit(ActorSystem("test", EventsourcedActorSpec.config))
@@ -1034,5 +1058,38 @@ class EventsourcedActorSpec extends TestKit(ActorSystem("test", EventsourcedActo
         evtProbe.expectMsg(("b", e3.vectorTimestamp, timestamp(3, 1), 3L))
       }
     }
+  }
+
+  "An EventsourcedActor" when {
+    "in sharedClockEntry = false mode" must {
+      "properly recover internal state even it doesn't handle self-emitted events (issue #266)" in {
+        testProperlyRecoverInternalStateEven(
+          event1a.copy(vectorTimestamp = VectorTime(emitterIdA -> 1L), processId = emitterIdA, localSequenceNr = 1L),
+          event1b.copy(vectorTimestamp = VectorTime(emitterIdA -> 2L), processId = emitterIdA, localSequenceNr = 2L),
+          sharedClockEntry = false)
+      }
+    }
+    "in sharedClockEntry = true mode" must {
+      "properly recover internal state even it doesn't handle self-emitted events (issue #266)" in {
+        testProperlyRecoverInternalStateEven(
+          event1a.copy(vectorTimestamp = VectorTime(logIdA -> 1L), processId = emitterIdA, localSequenceNr = 1L),
+          event1b.copy(vectorTimestamp = VectorTime(logIdA -> 2L), processId = emitterIdA, localSequenceNr = 2L),
+          sharedClockEntry = true)
+      }
+    }
+  }
+
+  private def testProperlyRecoverInternalStateEven(e1: DurableEvent, e2: DurableEvent, sharedClockEntry: Boolean): Unit = {
+    val actor = system.actorOf(Props(new TestUnhandledEmittedEventActor(logProbe.ref, cmdProbe.ref, evtProbe.ref, sharedClockEntry)))
+
+    logProbe.expectMsg(LoadSnapshot(emitterIdA, instanceId))
+    logProbe.sender() ! LoadSnapshotSuccess(None, instanceId)
+    logProbe.expectMsg(Replay(1L, Some(actor), instanceId))
+    logProbe.sender() ! ReplaySuccess(List(e1, e2), e2.localSequenceNr, instanceId)
+    logProbe.expectMsg(Replay(e2.localSequenceNr + 1L, None, instanceId))
+    logProbe.sender() ! ReplaySuccess(Nil, e2.localSequenceNr, instanceId)
+
+    actor ! "current-time"
+    cmdProbe.expectMsg(e2.vectorTimestamp)
   }
 }
