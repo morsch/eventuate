@@ -62,5 +62,15 @@ object SparkStreamAdapterExample extends App {
 
   // Generate new events from stdin
   val lines = Source.stdin.getLines()
-  while (lines.hasNext) writer.write(Seq(lines.next()))
+  def prompt(): Unit = {
+    if (lines.hasNext) lines.next() match {
+      case "exit" =>
+        sparkStreamingContext.stop(stopSparkContext = true)
+        system.terminate()
+      case line =>
+        writer.write(Seq(line))
+        prompt()
+    }
+  }
+  prompt()
 }
