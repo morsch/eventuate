@@ -42,6 +42,7 @@ object ProjectDependencies {
   val Log4jSlf4j =           "org.apache.logging.log4j"   % "log4j-slf4j-impl"          % Log4jVersion
   val SparkCore =            "org.apache.spark"          %% "spark-core"                % SparkVersion
   val SparkSql =             "org.apache.spark"          %% "spark-sql"                 % SparkVersion
+  val SparkStreaming =       "org.apache.spark"          %% "spark-streaming"           % SparkVersion
   val CassandraUnit =        "org.cassandraunit"          % "cassandra-unit"            % "3.0.0.1"
   val Leveldb =              "org.fusesource.leveldbjni"  % "leveldbjni-all"            % "1.8"
   val Sigar =                "org.fusesource"             % "sigar"                     % "1.6.4"
