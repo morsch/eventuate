@@ -28,12 +28,12 @@ import com.typesafe.config._
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
-class SparkAdapter(context: SparkContext, config: Config) {
+class SparkBatchAdapter(context: SparkContext, config: Config) {
   private val cassandraSettings =
     new CassandraEventLogSettings(config)
 
-  private implicit val converter: DurableEventTypeConverter =
-    new DurableEventTypeConverter(config)
+  private implicit val converter: DurableEventConverter =
+    new DurableEventConverter(config)
 
   TypeConverter.registerConverter(converter)
 
@@ -43,7 +43,7 @@ class SparkAdapter(context: SparkContext, config: Config) {
   }
 }
 
-private class DurableEventTypeConverter(config: Config) extends TypeConverter[DurableEvent] {
+private class DurableEventConverter(config: Config) extends TypeConverter[DurableEvent] {
   import scala.reflect.runtime.universe._
 
   val converter = implicitly[TypeConverter[Array[Byte]]]

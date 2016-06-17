@@ -27,7 +27,7 @@ import com.rbmhtechnology.eventuate.log.cassandra.CassandraEventLogSettings
 import org.apache.spark._
 import org.scalatest._
 
-class SparkAdapterSpec extends TestKit(ActorSystem("test")) with WordSpecLike with Matchers with SingleLocationSpecCassandraAdapter {
+class SparkBatchAdapterSpec extends TestKit(ActorSystem("test")) with WordSpecLike with Matchers with SingleLocationSpecCassandraAdapter {
   val cassandraSettings = new CassandraEventLogSettings(system.settings.config)
   val sparkConfig = new SparkConf(true)
     .set("spark.cassandra.connection.host", cassandraSettings.contactPoints.head.getHostName)
@@ -38,7 +38,7 @@ class SparkAdapterSpec extends TestKit(ActorSystem("test")) with WordSpecLike wi
     .setMaster("local[4]")
 
   var sparkContext: SparkContext = _
-  var sparkAdapter: SparkAdapter = _
+  var sparkAdapter: SparkBatchAdapter = _
 
   var probe: TestProbe = _
 
@@ -50,7 +50,7 @@ class SparkAdapterSpec extends TestKit(ActorSystem("test")) with WordSpecLike wi
   override def beforeAll(): Unit = {
     super.beforeAll()
     sparkContext = new SparkContext(sparkConfig)
-    sparkAdapter = new SparkAdapter(sparkContext, system.settings.config)
+    sparkAdapter = new SparkBatchAdapter(sparkContext, system.settings.config)
   }
 
   override def afterAll(): Unit = {

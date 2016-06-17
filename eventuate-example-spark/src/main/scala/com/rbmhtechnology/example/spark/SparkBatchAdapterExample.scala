@@ -19,7 +19,7 @@ package com.rbmhtechnology.example.spark
 import akka.actor.ActorSystem
 import com.rbmhtechnology.eventuate.DurableEvent
 
-import com.rbmhtechnology.eventuate.adapter.spark.SparkAdapter
+import com.rbmhtechnology.eventuate.adapter.spark.SparkBatchAdapter
 import com.rbmhtechnology.eventuate.log.EventLogWriter
 import com.rbmhtechnology.eventuate.log.cassandra.{ CassandraEventLogSettings, CassandraEventLog }
 
@@ -33,7 +33,7 @@ import scala.concurrent.duration._
 
 case class DomainEvent(sequenceNr: Long, payload: String)
 
-object SparkAdapterExample extends App {
+object SparkBatchAdapterExample extends App {
 
   // ---------------------------------------------------------------
   //  Assumption: Cassandra 2.1 or higher running on localhost:9042
@@ -57,16 +57,18 @@ object SparkAdapterExample extends App {
   Await.result(new EventLogWriter("writer", log).write(Seq("a", "b", "c", "d", "e")), 20.seconds)
 
   val sparkContext: SparkContext = new SparkContext(sparkConfig)
-  val sparkAdapter: SparkAdapter = new SparkAdapter(sparkContext, system.settings.config)
   val sqlContext: SQLContext = new SQLContext(sparkContext)
+
+  // Create an Eventuate Spark batch adapter
+  val sparkBatchAdapter: SparkBatchAdapter = new SparkBatchAdapter(sparkContext, system.settings.config)
 
   import sqlContext.implicits._
 
   // Fetch all events from given event log as Spark RDD
-  val events: RDD[DurableEvent] = sparkAdapter.eventLog(logId)
+  val events: RDD[DurableEvent] = sparkBatchAdapter.eventLog(logId)
 
   // Fetch events starting at sequence number 3 from given event log as Spark RDD
-  val eventsFrom: RDD[DurableEvent] = sparkAdapter.eventLog(logId, fromSequenceNr = 3L)
+  val eventsFrom: RDD[DurableEvent] = sparkBatchAdapter.eventLog(logId, fromSequenceNr = 3L)
 
   // By default, events are sorted by sequence number *per partition*.
   // Use .sortBy(_.localSequenceNr) to create a totally ordered RDD.
@@ -74,9 +76,11 @@ object SparkAdapterExample extends App {
 
   // Create a custom DataFrame from RDD[DurableEvent]
   val eventsDF: DataFrame = events.map(event => DomainEvent(event.localSequenceNr, event.payload.toString)).toDF()
+  // Obtaining DataFrames directly will be supported in a later version
 
   // Create a custom Dataset from RDD[DurableEvent]
   val eventDS: Dataset[DomainEvent] = events.map(event => DomainEvent(event.localSequenceNr, event.payload.toString)).toDS()
+  // Obtaining DataSets directly will be supported in a later version
 
   // Write sorted events to stdout
   eventsSorted.collect().foreach(println)
